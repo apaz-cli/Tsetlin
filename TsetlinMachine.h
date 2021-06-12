@@ -7,6 +7,7 @@
 
 #include "TsetlinParams.h"
 
+
 // A basic Tsetlin machine.
 // Takes a binary string as input and returns a single bit answer.
 struct TsetlinMachine {
@@ -29,23 +30,16 @@ struct MultiClassTsetlinMachine {
 typedef struct MultiClassTsetlinMachine MultiClassTsetlinMachine;
 
 
-/////////////////////////////////////
-// Tsetlin Machine Building Blocks //
-/////////////////////////////////////
-
-///////////////////////
-// Forward Functions //
-///////////////////////
+//////////////////////////////////////////////////////
+// Tsetlin Machine Forward Function Building Blocks //
+//////////////////////////////////////////////////////
 
 static inline void
-make_literals(tint* input, tint* input_conjugate_space) {
+literals_forward(tint* input, tint* input_conjugate_space) {
     for (size_t i = 0; i < TSETLIN_INPUT_BUF_LEN; i++)
         input_conjugate_space[i] = ~input[i];
 }
 
-// Computes the output of a single clause.
-// Input: input vector, clause number
-// Output: 1 or 0
 static inline bool
 clause_forward(TsetlinMachine* tm, size_t clause_num, tint* input, tint* input_conjugate) {
     
@@ -70,7 +64,7 @@ clause_forward(TsetlinMachine* tm, size_t clause_num, tint* input, tint* input_c
         for (size_t i = 0; i < TINT_BITNUM; i++) {
             // For each automaton, pack a bit into the results.
             automaton_results[buf_idx] |= 
-                ((clause_automata[buf_idx*TINT_BITNUM+i] >= 0) << i);
+                ((tint)(clause_automata[buf_idx*TINT_BITNUM+i] >= 0) << i);
         }
     }
 
@@ -113,41 +107,57 @@ clause_forward(TsetlinMachine* tm, size_t clause_num, tint* input, tint* input_c
         tint inc  = automaton_results[i];
         tint inp  = input[i];
         // Returning from inside the loop slaughters the compiler.
-        ret &= (inc ^ inp) & inc;
+        ret |= (inc ^ inp) & inc;
     }
 
-    // If we've already ANDed a zero, the whole thing 
-    // will be zero, so return.
+    // If we've already ORed a nonzero value, return.
     if (ret) return 0;
 
     // Now the conjugate
     for (size_t i = 0; i < TSETLIN_INPUT_BUF_LEN; i++) {
         tint inc  = automaton_results[TSETLIN_INPUT_BUF_LEN+i];
         tint inp  = input_conjugate[i];
-        ret &= (inc ^ inp) & inc;
+        ret |= (inc ^ inp) & inc;
     }
 
     // return 0 if ret has any bits set, else 1.
-    // Are clauses without literals handled correctly?
     return !ret;
+}
+
+static inline void
+literals_clause_forward(TsetlinMachine* tm, tint* input, bool* pos_clause_output_space, bool* neg_clause_output_space) {
+    // Conjugate the input
+    tint input_conjugate[TSETLIN_INPUT_BUF_LEN];
+    literals_forward(input, input_conjugate);
+
+    // Compute positive and negative polarity clauses
+    for (size_t i = 0; i < TSETLIN_POS_CLAUSE_NUM; i++)
+        pos_clause_output_space[i] = clause_forward(tm, i, input, input_conjugate);
+    for (size_t i = 0; i < TSETLIN_NEG_CLAUSE_NUM; i++)
+        neg_clause_output_space[i] = clause_forward(tm, i, input, input_conjugate);   
 }
 
 static inline int
 summation_forward(bool* pos_clause_outputs, bool* neg_clause_outputs) {
     int pos = 0, neg = 0;
-
-    // I'm going to trust clang to make the right call
-    // about unrolling these loops.
-    for (uint i = 0; i < TSETLIN_POS_CLAUSE_NUM; i++) {
+    for (uint i = 0; i < TSETLIN_POS_CLAUSE_NUM; i++)
         pos += pos_clause_outputs[i];
-    }
-
-    for (uint i = 0; i < TSETLIN_NEG_CLAUSE_NUM; i++) {
+    for (uint i = 0; i < TSETLIN_NEG_CLAUSE_NUM; i++)
         neg += neg_clause_outputs[i];
-    }
-
     return pos - neg;
 }
+
+static inline int
+literals_clause_summation_forward(TsetlinMachine* tm, tint* input) {
+    // Compute clause outputs
+    bool pos_clause_outputs[TSETLIN_POS_CLAUSE_NUM];
+    bool neg_clause_outputs[TSETLIN_NEG_CLAUSE_NUM];
+    literals_clause_forward(tm, input, pos_clause_outputs, neg_clause_outputs);
+    
+    // Sum positive and negative clauses
+    return summation_forward(pos_clause_outputs, neg_clause_outputs);
+}
+
 
 static inline uint
 argmax_forward(int* sums, const uint n) {
@@ -231,38 +241,22 @@ clause_apply_type2_backward() {}
 
 static inline void
 TsetlinMachine_init(TsetlinMachine* tm) {
-    // Initialize automata state randomly to -1 or 0.
-    srand(time(NULL));
-    for (size_t i = 0; i < TSETLIN_CLAUSE_NUM; i++)
-        for(size_t j = 0; j++ < TSETLIN_NUM_AUTOMATA; j++)
-            tm->automata_states[i][j] = -(rand() & 1);
+    // This is equivalent to writing two loops, but a milisecond or so faster.
+    for (size_t z = 0; z < TSETLIN_NUM_AUTOMATA*TSETLIN_CLAUSE_NUM; z++)
+            tm->automata_states[z/TSETLIN_NUM_AUTOMATA][z%TSETLIN_NUM_AUTOMATA] = -(rand() & 1);
 }
 
 static inline bool
 TsetlinMachine_forward(TsetlinMachine* tm, tint* input) {
-
-    // Conjugate the input
-    tint input_conjugate[TSETLIN_INPUT_BUF_LEN];
-    make_literals(input, input_conjugate);
-
-    // Compute positive and negative polarity clauses
-    bool pos_clause_outputs[TSETLIN_POS_CLAUSE_NUM];
-    bool neg_clause_outputs[TSETLIN_NEG_CLAUSE_NUM];
-    for (size_t i = 0; i < TSETLIN_POS_CLAUSE_NUM; i++)
-        pos_clause_outputs[i] = clause_forward(tm, i, input, input_conjugate);
-    for (size_t i = TSETLIN_POS_CLAUSE_NUM; i < TSETLIN_CLAUSE_NUM; i++)
-        pos_clause_outputs[i] = clause_forward(tm, i, input, input_conjugate);
-    
-    // Sum positive and negative clauses
-    int sum = summation_forward(pos_clause_outputs, neg_clause_outputs);
-
-    // Threshold
-    return sum >= 0;
+    // Forward and apply threshold
+    return literals_clause_summation_forward(tm, input) >= 0;
 }
 
-static inline void
-TsetlinMachine_forward_backward(TsetlinMachine* tm, tint* input) {
-
+static inline bool
+TsetlinMachine_forward_backward(TsetlinMachine* tm, tint* input, bool label) {
+    int forward_result = literals_clause_summation_forward(tm, input);
+    // TODO
+    return 0;
 }
 
 
@@ -284,4 +278,14 @@ TsetlinEnsemble_forward(TsetlinEnsemble* en, tint* input) {
 static inline void
 TsetlinEnsemble_forward_backward(TsetlinEnsemble* en, tint* input) {
 
+}
+
+/////////////////
+// Multi Class //
+/////////////////
+
+static inline void 
+MultiClassTsetlinMachine_init(MultiClassTsetlinMachine* mctm) {
+    for (size_t i = 0; i < TSETLIN_CLASS_NUM; i++) 
+        TsetlinMachine_init(mctm->machines + i);
 }

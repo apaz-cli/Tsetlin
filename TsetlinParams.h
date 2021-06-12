@@ -27,11 +27,9 @@
 // The number of TsetlinAutomata per clause per TsetlinMachine.
 #define TSETLIN_NUM_AUTOMATA (TSETLIN_INPUT_BIT_SIZE * 2)
 
-// The number of clauses in each TsetlinMachine that
-// have positive polarity.
-#define TSETLIN_POS_CLAUSE_NUM TSETLIN_CLAUSE_NUM/2
-
-// The number of clauses in each TsetlinMachine that
-// have negative polarity.
-#define TSETLIN_NEG_CLAUSE_NUM TSETLIN_CLAUSE_NUM/2
+// The number of clauses for each TsetlinMachine.
+// This must be an even number because there must
+// be an equal number of positive and negative 
+// polarity clauses.
+#define TSETLIN_CLAUSE_NUM (TSETLIN_POS_CLAUSE_NUM+TSETLIN_NEG_CLAUSE_NUM)
 

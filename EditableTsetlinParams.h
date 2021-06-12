@@ -16,13 +16,15 @@
 // The input size of the tsetlin machine in bits.
 // This must be a multiple of 64 because the input is 
 // packed into a buffer of uint64.
-#define TSETLIN_INPUT_BIT_SIZE 160 * 320
+#define TSETLIN_INPUT_BIT_SIZE 128
 
-// The number of clauses for each TsetlinMachine.
-// This must be an even number because there must
-// be an equal number of positive and negative 
-// polarity clauses.
-#define TSETLIN_CLAUSE_NUM 32
+// The number of clauses in each TsetlinMachine that
+// have positive polarity.
+#define TSETLIN_POS_CLAUSE_NUM 32
+
+// The number of clauses in each TsetlinMachine that
+// have negative polarity.
+#define TSETLIN_NEG_CLAUSE_NUM 32
 
 // The number of states per TsetlinAutomaton.
 // The TsetlinAutomaton's type only describes its state.
