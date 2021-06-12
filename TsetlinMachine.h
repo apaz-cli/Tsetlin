@@ -165,7 +165,6 @@ argmax_forward(int* sums, const uint n) {
     uint argmax = 0;
     int highest = sums[argmax];
     
-    // Trust in clang to unroll
     for (uint i = 1; i < n; i++) {
         if (sums[i] >= highest) {
             argmax = i;
