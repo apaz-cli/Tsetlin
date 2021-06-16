@@ -1,4 +1,5 @@
 // #include "TsetlinParams.h"
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <iostream>
@@ -12,6 +13,11 @@
 /////////////////////
 // Tsetlin Machine //
 /////////////////////
+
+template <typename TsetlinAutomaton, size_t num_clauses, size_t num_automata>
+struct TsetlinMachineCheckpoint {
+    TsetlinAutomaton automata_states[num_clauses][num_automata];
+};
 
 template <size_t input_buf_len, size_t num_clauses, size_t summation_target,
           typename TsetlinAutomaton = char, size_t num_states = 128>
@@ -47,6 +53,13 @@ class TsetlinMachine {
         for (size_t y = 0; y < num_clauses; y++)
             for (size_t x = 0; x < num_automata; x++)
                 automata_states[y][x] = -(rand() & 1);
+    }
+
+    const inline void
+    literals_forward(std::array<tint, input_buf_len> &input,
+                     std::array<tint, input_buf_len> &input_conjugate) {
+        for (size_t i = 0; i < input_buf_len; i++)
+            input_conjugate[i] = ~input[i];
     }
 
     const inline bool
@@ -108,43 +121,20 @@ class TsetlinMachine {
     }
 
     const inline void
-    literals_clauses_forward(
-        std::array<tint, input_buf_len> &input,
-        std::array<tint, clause_output_buf_len> &clause_output_buf) {
-        // Conjugate the input to form the literals
-        std::array<tint, input_buf_len> input_conjugate;
-        for (size_t i = 0; i < input_buf_len; i++)
-            input_conjugate[i] = ~input[i];
-
-        #pragma clang loop unroll(enable)
-        // For each bit, pack it into the buffer
+    clauses_forward(std::array<tint, input_buf_len> &input,
+                    std::array<tint, input_buf_len> &input_conjugate,
+                    std::array<bool, num_clauses> &clause_outputs) {
         for (size_t i = 0; i < num_clauses; i++)
-            clause_output_buf[i / TINT_BIT_NUM] =
-                clause_forward(i, input, input_conjugate) << (i % TINT_BIT_NUM);
+            clause_outputs[i] = clause_forward(i, input, input_conjugate);
     }
 
     const static inline int
-    summation_forward(std::array<tint, clause_output_buf_len> &clause_outputs) {
-        constexpr size_t halfway = clause_output_buf_len / 2;
+    summation_forward(std::array<bool, num_clauses> &clause_outputs) {
+        constexpr size_t halfway = num_clauses / 2;
         int pos = 0, neg = 0;
-        #pragma clang loop unroll(enable)
-        for (size_t i = 0; i < halfway; i++)
-            pos += std::__popcount(clause_outputs[i]);
-        #pragma clang loop unroll(enable)
-        for (size_t i = halfway; i < clause_output_buf_len; i++)
-            neg += std::__popcount(clause_outputs[i]);
+        for (size_t i = 0; i < halfway; i++) pos += clause_outputs[i];
+        for (size_t i = 0; i < halfway; i++) neg += clause_outputs[i];
         return pos - neg;
-    }
-
-    const inline int
-    literals_clause_summation_forward(std::array<tint, input_buf_len> &input) {
-        // Compute clause outputs
-        std::array<tint, clause_output_buf_len> clause_outputs;
-        clause_outputs.fill(0);
-        literals_clauses_forward(input, clause_outputs);
-
-        // Sum positive and negative clauses
-        return summation_forward(clause_outputs);
     }
 
     const static inline bool
@@ -154,7 +144,20 @@ class TsetlinMachine {
 
     const inline bool
     forward(std::array<tint, input_buf_len> &input) {
-        return threshold_forward(literals_clause_summation_forward(input));
+        // Literals forward
+        std::array<tint, input_buf_len> input_conjugate;
+        literals_forward(input, input_conjugate);
+
+        // Clauses forward
+        std::array<bool, num_clauses> clause_outputs;
+        clauses_forward(input, input_conjugate, clause_outputs);
+
+        // Summation forward
+        int sum = summation_forward(clause_outputs);
+
+        // Threshold
+        bool decision = threshold_forward(sum);
+        return decision;
     }
 
     ///////////////
@@ -170,20 +173,70 @@ class TsetlinMachine {
         // clang-format on
     }
 
-    const inline void 
-    applyTypeOneFeedback() {
-        constexpr static size_t T = summation_target;
-
-    }
-
-    const inline void 
-    applyTypeTwoFeedback() {
-        constexpr static size_t T = summation_target;
-
-    }
+    const inline void
+    applyFeedback(bool result) {}
 
     const inline bool
-    forward_backward(std::array<tint, input_buf_len> &input) {}
+    forward_backward(std::array<tint, input_buf_len> &input,
+                     bool desired_output) {
+        /////////////
+        // Forward //
+        /////////////
+
+        // Literals forward
+        std::array<tint, input_buf_len> input_conjugate;
+        literals_forward(input, input_conjugate);
+
+        // Clauses forward
+        std::array<bool, num_clauses> clause_outputs;
+        clauses_forward(input, input_conjugate, clause_outputs);
+
+        // Summation forward
+        int sum = summation_forward(clause_outputs);
+
+        // Threshold
+        bool decision = threshold_forward(sum);
+
+        //////////////
+        // Backward //
+        //////////////
+
+        TsetlinAutomaton feedback[num_clauses][num_automata];
+        static constexpr size_t halfway = num_clauses / 2;
+        for (size_t j = 0; j < halfway; j++) {
+            if (decision) {
+            } else {
+            }
+        }
+
+        for (size_t j = halfway; j < num_clauses; j++) {
+        }
+
+        return decision;
+    }
+
+    /////////////
+    // UTILITY //
+    /////////////
+
+    const inline TsetlinMachineCheckpoint<TsetlinAutomaton, num_clauses,
+                                          num_automata> &&
+    checkpoint() {
+        TsetlinMachineCheckpoint<TsetlinAutomaton, num_clauses, num_automata>
+            tmc;
+        for (size_t y = 0; y < num_clauses; y++)
+            for (size_t x = 0; x < num_automata; x++)
+                tmc.automata_states[y][x] = automata_states[y][x];
+        return std::move(tmc);
+    }
+
+    const inline void
+    resumeCheckpoint(TsetlinMachineCheckpoint<TsetlinAutomaton, num_clauses,
+                                              num_automata> &checkpoint) {
+        for (size_t y = 0; y < num_clauses; y++)
+            for (size_t x = 0; x < num_automata; x++)
+                automata_states[y][x] = checkpoint.automata_states[y][x];
+    }
 };
 
 #endif  // TSETLIN_MACHINE_INCLUDE
