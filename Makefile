@@ -1,6 +1,6 @@
 # A very basic makefile.
 
-CC = clang
+CC = clang++
 
 SPEEDFLAGS = -Ofast -march=native -fwhole-program -flto
 DEBUGFLAGS = -Og -g -fsanitize=address

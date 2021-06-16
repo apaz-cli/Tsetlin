@@ -13,8 +13,8 @@
 // Tsetlin Machine //
 /////////////////////
 
-template <size_t input_buf_len, size_t summation_target, size_t num_clauses = 64,
-          typename TsetlinAutomaton = char, TsetlinAutomaton num_states = 127>
+template <size_t input_buf_len, size_t num_clauses, size_t summation_target,
+          typename TsetlinAutomaton = char, size_t num_states = 128>
 class TsetlinMachine {
    private:
     // Calculated Parameters
@@ -155,6 +155,31 @@ class TsetlinMachine {
     const inline bool
     forward(std::array<tint, input_buf_len> &input) {
         return threshold_forward(literals_clause_summation_forward(input));
+    }
+
+    ///////////////
+    // Backwards //
+    ///////////////
+
+    const static inline int
+    clip(int x) {
+        // clang-format off
+        if (x < -summation_target) return -summation_target;
+        else if (x > summation_target) return summation_target;
+        else return x;
+        // clang-format on
+    }
+
+    const inline void 
+    applyTypeOneFeedback() {
+        constexpr static size_t T = summation_target;
+
+    }
+
+    const inline void 
+    applyTypeTwoFeedback() {
+        constexpr static size_t T = summation_target;
+
     }
 
     const inline bool
