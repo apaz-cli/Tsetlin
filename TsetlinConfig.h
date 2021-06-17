@@ -2,9 +2,6 @@
 #ifndef TSETLIN_CONFIG_INCLUDE
 #define TSETLIN_CONFIG_INCLUDE
 
-#include <bits/stdint-uintn.h>
-
-#include <bit>
 #include <cinttypes>
 #include <cstddef>
 #include <exception>
@@ -16,7 +13,7 @@
 // This is also set in the makefile with a script.
 
 #ifndef BITNUM
-#define BITNUM 64
+#define BITNUM 32
 #endif
 
 #if BITNUM == 64

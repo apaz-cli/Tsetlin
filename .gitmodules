@@ -1,0 +1,3 @@
+[submodule "MNIST-dataloader-for-C"]
+	path = MNIST-dataloader-for-C
+	url = https://github.com/apaz-cli/MNIST-dataloader-for-C.git
