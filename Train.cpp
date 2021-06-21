@@ -1,8 +1,17 @@
+#include <memory>
+
 #include "BinaryMNIST.h"
 
-int main() {
+#define EPOCHS 400
+
+int
+main() {
     char folder[] = "MNIST-dataloader-for-C/data/";
-    MNIST mnist;
-    MNIST_load(&mnist, folder);
+
+    auto bmnist = std::unique_ptr<BinaryMNIST<>>(new BinaryMNIST<>(folder));
+    
+    for (size_t epoch = 0; epoch < EPOCHS; i++) {
+        
+    }
 
 }

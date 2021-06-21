@@ -2,9 +2,10 @@
 
 CC = clang++
 
+NORMFLAGS = --std=c++20
 SPEEDFLAGS = -Ofast -march=native -fwhole-program -flto
 DEBUGFLAGS = -Og -g -fsanitize=address
-WARNFLAGS  = -Wall -Wextra -Wshadow -Wpedantic
+WARNFLAGS  = -Wall -Wextra -Wshadow -Wpedantic -Wimplicit
 
 OBJ = Main.o
 
@@ -18,10 +19,10 @@ DISASSEMBLY_NAME = bin.dmp
 .PHONY: clean $(BINARY_NAME)
 
 build: $(OBJ)
-	$(CC) -o $(BINARY_NAME) $(OBJ) -DBITNUM=$(BITNUM) $(WARNFLAGS) $(SPEEDFLAGS)
+	$(CC) -o $(BINARY_NAME) $(OBJ) -DBITNUM=$(BITNUM) $(NORMFLAGS) $(WARNFLAGS) $(SPEEDFLAGS)
 
 debug: $(OBJ)
-	$(CC) -o $(BINARY_NAME) $(OBJ) -DBITNUM=$(BITNUM) $(WARNFLAGS) $(DEBUGFLAGS)
+	$(CC) -o $(BINARY_NAME) $(OBJ) -DBITNUM=$(BITNUM) $(NORMFLAGS) $(WARNFLAGS) $(DEBUGFLAGS)
 
 strip:
 	strip -sx $(BINARY_NAME)

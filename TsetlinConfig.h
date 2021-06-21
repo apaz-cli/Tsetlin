@@ -4,29 +4,6 @@
 
 #include <cinttypes>
 #include <cstddef>
-#include <exception>
-
-//////////////////////////////////////////////////
-// Make the code work on 32 and 64 bit machines //
-//////////////////////////////////////////////////
-
-// This is also set in the makefile with a script.
-
-#ifndef BITNUM
-#define BITNUM 32
-#endif
-
-#if BITNUM == 64
-#define TINT_PRI "%" PRIu64
-#define TINT_BIT_NUM 64
-#define TINT_MAX 0xFFFFFFFFFFFFFFFF
-#define tint uint64_t
-#else
-#define TINT_PRI "%" PRIu32
-#define TINT_BIT_NUM 32
-#define TINT_MAX 0xFFFFFFFF
-#define tint uint32_t
-#endif  // BITNUM
 
 ////////////////////////
 // Argmax Tiebreaking //
