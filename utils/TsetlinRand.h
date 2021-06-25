@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <limits>
 
-#include "TsetlinConfig.h"
+#include "TsetlinBitset.h"
 
 class TsetlinRandGen {
     constexpr static float max_16 = 65536.0;
@@ -60,5 +60,13 @@ class TsetlinRandGen {
             answer |= (a1 | a2 | a3 | a4);
         }
         return answer;
+    }
+
+    template <size_t bits>
+    void
+    biased_bits(TBitset<bits>& to_pack) {
+        size_t backing_buf_size = to_pack.backing_size();
+        tint* backing = to_pack.get_backing();
+        
     }
 };

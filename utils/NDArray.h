@@ -11,8 +11,6 @@
 #include <string>
 #include <string_view>
 
-#include "TsetlinConfig.h"
-
 template <typename T, size_t... shape>
 class NDArray {
     static_assert((1 and ... and shape), "All dimensions must be non-zero");
@@ -61,7 +59,7 @@ class NDArray {
     // clang-format off
     template <std::convertible_to<std::size_t>... Args>
     requires(sizeof...(Args) == dimensions - 1)
-    static size_t
+    static constexpr size_t
     index1d(size_t arg1, Args... args) noexcept {
         size_t totalOffset = 1;
         size_t idx = arg1;
@@ -107,7 +105,7 @@ class NDArray {
 
     size_t
     get_checked() requires(dimensions == 0) {
-        return 0;
+        return arr[index1d()];
     }
 
     template <std::convertible_to<std::size_t>... Args>
@@ -121,34 +119,3 @@ class NDArray {
 };
 
 #endif  // NDARRAY_INCLUDE
-
-int
-main() {
-    NDArray<int> nd0;
-    NDArray<int, 5> nd1;
-    NDArray<int, 1, 2, 3> nd3;
-
-    std::cout << nd0.get() << std::endl;
-    std::cout << nd1.get(4) << std::endl;
-    std::cout << nd3.get(1, 1, 1) << std::endl;
-    nd0.get_checked();
-    nd1.get_checked(5);
-    nd3.get_checked(1, 1, 1);
-
-    return 0;
-}
-/*
-```java
-public static int index1d(int[] shape, int... indices) {
-    int totalOffset = 1;
-    int idx = indices[0], d = 0;
-
-    for (d = 1; d < indices.length; d++) {
-                          totalOffset *= shape[d - 1];
-                          idx += indices[d] * totalOffset;
-                }
-
-    return idx;
-}
-```
-*/

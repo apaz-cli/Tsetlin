@@ -3,16 +3,16 @@ extern "C" {
 #include "MNIST-dataloader-for-C/mnist.h"
 }
 #include "TsetlinBitset.h"
-#include "TsetlinMachine.h"
 
 #define MNIST_AS_TINT_SIZE ((MNIST_IMG_SIZE / TINT_BIT_NUM) + 1)
 
-template <size_t img_size = MNIST_IMG_SIZE>
 struct BinaryMNIST {
-    TBitset<img_size> train_60k[60000];
-    TBitset<img_size> test_10k[10000];
+    TBitset<MNIST_IMG_SIZE> train_60k[60000];
+    TBitset<MNIST_IMG_SIZE> test_10k[10000];
     unsigned char* label_60k;
     unsigned char* label_10k;
+    size_t num_train = 60000;
+    size_t num_test = 10000;
 
     BinaryMNIST(char data_folder[], float threshold = .3)
         : train_60k(), test_10k() {
@@ -20,7 +20,7 @@ struct BinaryMNIST {
         MNIST_load(&mnist, data_folder);
 
         // Convert and store the images
-        auto convert = [&](unsigned char* img, TBitset<img_size>* bref) {
+        auto convert = [&](unsigned char* img, TBitset<MNIST_IMG_SIZE>* bref) {
             for (size_t j = 0; j < MNIST_IMG_SIZE; j++) {
                 bref[j] = (img[j] > (255 * threshold));
             }
@@ -28,13 +28,13 @@ struct BinaryMNIST {
 
         for (size_t i = 0; i < 60000; i++) {
             unsigned char* img = MNIST_train_img(&mnist, i);
-            TBitset<img_size>* bref = train_60k + i;
+            TBitset<MNIST_IMG_SIZE>* bref = train_60k + i;
             convert(img, bref);
         }
 
         for (size_t i = 0; i < 10000; i++) {
             unsigned char* img = MNIST_test_img(&mnist, i);
-            TBitset<img_size>* bref = test_10k + i;
+            TBitset<MNIST_IMG_SIZE>* bref = test_10k + i;
             convert(img, bref);
         }
 

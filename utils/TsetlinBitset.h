@@ -9,8 +9,6 @@
 #include <stdexcept>
 #include <string>
 
-#include "TsetlinConfig.h"
-
 #ifndef BITNUM
 #define BITNUM 64
 #endif
@@ -57,21 +55,16 @@ class TBitset {
         size_t buf_idx;
         size_t offset;
 
-        constexpr TBitRef(TBitset& owner, size_t idx) {
-            this->owner = owner;
-            this->buf_idx = idx / TINT_BIT_NUM;
-            this->offset = idx % TINT_BIT_NUM;
-        }
-        constexpr TBitRef(TBitset& owner, size_t buf_idx, size_t offset) {
-            this->owner = owner;
-            this->buf_idx = buf_idx;
-            this->offset = offset;
-        }
+       public:
+        constexpr TBitRef(TBitset& owner, size_t idx)
+            : owner(owner),
+              buf_idx(idx / TINT_BIT_NUM),
+              offset(idx % TINT_BIT_NUM) {}
+        constexpr TBitRef(TBitset& owner, size_t buf_idx, size_t offset)
+            : owner(owner), buf_idx(buf_idx), offset(offset) {}
         friend class Bitset;
         TBitRef() noexcept;  // no public constructor
 
-       public:
-        ~TBitRef();
         // convert to bool
         operator bool() const noexcept {
             tint b = owner.buf[buf_idx];
@@ -81,22 +74,28 @@ class TBitset {
         // assign bool
         TBitRef&
         operator=(bool x) noexcept {
-            tint elem = owner.buf[buf_idx];
-            tint mask = (1 << offset);
-            if (x)
-                elem |= mask;
-            else
-                elem &= (~mask);
-            owner.buf[buf_idx] = elem;
-            return this;
+            // Get the part of the buffer we're working on
+            tint orig = owner.buf[buf_idx];
+            // Create 0s, except for one 1 at the offset position.
+            // Negate, creating 1s, except for one 0 at the offset position.
+            tint negmask = ~(1 << offset);
+            // Set the bit in the original at the offset to 0.
+            orig &= negmask;
+            // xor x to assign x to the offset bit. (xor identity)
+            orig ^= (x << offset);
+            // Put back in the buffer.
+            owner.buf[buf_idx] = orig;
+
+            // Return this so ops can be chained.
+            return *this;
         }
         // assign bit
         TBitRef&
         operator=(const TBitRef& x) noexcept {
             // uses previous operator=()
             // and operator bool()
-            this = (bool)x;
-            return this;
+            *this = (bool)x;
+            return *this;
         }
         // flip bit value
         TBitRef&
@@ -104,7 +103,7 @@ class TBitset {
             tint elem = owner.buf[buf_idx];
             elem ^= (1 << offset);
             owner.buf[buf_idx] = elem;
-            return this;
+            return *this;
         }
         // return inverse value
         bool
@@ -141,9 +140,7 @@ class TBitset {
 
     std::array<bool, num_bits>&
     unravel(std::array<bool, num_bits>& space) noexcept {
-        for (size_t i = 0; i < num_bits; i++) {
-            space[i] = this[i];
-        }
+        for (size_t i = 0; i < num_bits; i++) space[i] = this[i];
     }
 
     size_t
@@ -167,12 +164,12 @@ class TBitset {
     // Bit access operators
     bool
     operator[](size_t pos) const noexcept {
-        return (bool)TBitRef(this, pos);
+        return (bool)TBitRef(*this, pos);
     }
 
     TBitRef
     operator[](size_t pos) noexcept {
-        return TBitRef(this, pos);
+        return TBitRef(*this, pos);
     }
 
     bool
@@ -186,7 +183,7 @@ class TBitset {
     // Inverts the bits of this bitset, placing the results in output.
     static void
     _inverse(TBitset& output, TBitset& to_invert) noexcept {
-        for (size_t i = 0; i < buf_len; i++) output.buf[i] = ~to_invert->buf[i];
+        for (size_t i = 0; i < buf_len; i++) output.buf[i] = ~to_invert.buf[i];
     }
 
     // Ands the bits of this and to_and, placing the result in output
@@ -214,50 +211,50 @@ class TBitset {
     TBitset
     operator~() const noexcept {
         TBitset bs = TBitset();
-        _inverse(bs, *this);
+        _inverse(bs, (TBitset&)*this);
         return bs;
     };
     TBitset
-    operator&(const TBitset& rhs) const noexcept {
+    operator&(TBitset& rhs) const noexcept {
         TBitset bs = TBitset();
-        _and(bs, *this, rhs);
+        _and(bs, (TBitset&)*this, rhs);
         return bs;
     };
     TBitset
-    operator|(const TBitset& rhs) const noexcept {
+    operator|(TBitset& rhs) const noexcept {
         TBitset bs = TBitset();
-        _or(bs, *this, rhs);
+        _or(bs, (TBitset&)*this, rhs);
         return bs;
     }
     TBitset
-    operator^(const TBitset& rhs) const noexcept {
+    operator^(TBitset& rhs) const noexcept {
         TBitset bs = TBitset();
-        _xor(bs, *this, rhs);
+        _xor(bs, (TBitset&)*this, rhs);
         return bs;
     }
     TBitset&
-    operator&=(const TBitset& rhs) noexcept {
-        _and(*this, *this, rhs);
-        return this;
+    operator&=(TBitset& rhs) noexcept {
+        _and((TBitset&)*this, (TBitset&)*this, rhs);
+        return *this;
     }
     TBitset&
-    operator|=(const TBitset& rhs) noexcept {
-        _or(*this, *this, rhs);
-        return this;
+    operator|=(TBitset& rhs) noexcept {
+        _or((TBitset&)*this, (TBitset&)*this, rhs);
+        return *this;
     }
     TBitset&
-    operator^=(const TBitset& rhs) noexcept {
-        _xor(*this, *this, rhs);
-        return this;
+    operator^=(TBitset& rhs) noexcept {
+        _xor((TBitset&)*this, (TBitset&)*this, rhs);
+        return *this;
     }
     bool
-    operator==(const TBitset& rhs) const noexcept {
+    operator==(TBitset& rhs) const noexcept {
         size_t ans = 0;
         for (size_t i = 0; i < buf_len; i++) ans |= this->buf[i] ^ rhs.buf[i];
         return ans ? 1 : 0;
     }
     bool
-    operator!=(const TBitset& rhs) const noexcept {
+    operator!=(TBitset& rhs) const noexcept {
         return !this == rhs;
     }
 
@@ -265,12 +262,15 @@ class TBitset {
     to_string() {
         // Nothing performance sensitive depends on this.
         std::string s = "";
-        for (bool b : this) s += b ? '1' : '0';
+        for (size_t i = 0; i < num_bits; i++) {
+            bool b = (*this)[i];
+            s += b ? '1' : '0';
+        }
         return s;
     }
 
     friend std::ostream&
-    operator<<(std::ostream& os, const TBitset& bs) {
+    operator<<(std::ostream& os, TBitset& bs) {
         os << bs.to_string();
         return os;
     }
