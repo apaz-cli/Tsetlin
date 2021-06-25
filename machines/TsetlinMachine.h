@@ -11,7 +11,6 @@
 
 #include "../utils/TsetlinBitset.h"
 #include "../utils/TsetlinRand.h"
-#include "../utils/TsetlinRand.h"
 
 /////////////////////
 // Tsetlin Machine //

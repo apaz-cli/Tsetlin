@@ -6,13 +6,16 @@
 
 #include "TsetlinBitset.h"
 
+#ifndef TSETLIN_RAND_INCLUDE
+#define TSETLIN_RAND_INCLUDE
+
 class TsetlinRandGen {
     constexpr static float max_16 = 65536.0;
 
    public:
     uint64_t state;
-
-    inline TsetlinRandGen(uint64_t seed = 0) { state = seed; }
+    
+    inline TsetlinRandGen(uint64_t seed = 0xabcdef0123456789) { state = seed; }
 
     uint64_t
     rand() noexcept {
@@ -21,6 +24,17 @@ class TsetlinRandGen {
         x ^= x >> 7;
         x ^= x << 17;
         state = x;
+        return x;
+    }
+
+    uint32_t
+    rand_32() noexcept {
+        uint32_t x = state;
+        // TODO WHAT WERE THESE SUPPOSED TO BE FOR 32 BIT
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        state = state ^ x;
         return x;
     }
 
@@ -67,6 +81,8 @@ class TsetlinRandGen {
     biased_bits(TBitset<bits>& to_pack) {
         size_t backing_buf_size = to_pack.backing_size();
         tint* backing = to_pack.get_backing();
-        
+        for (size_t i = 0; i < to_pack; i++) ;
     }
 };
+
+#endif  // TSETLIN_RAND_INCLUDE

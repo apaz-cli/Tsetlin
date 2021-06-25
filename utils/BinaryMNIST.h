@@ -1,10 +1,8 @@
-
 extern "C" {
-#include "MNIST-dataloader-for-C/mnist.h"
+#include "../MNIST-dataloader-for-C/mnist.h"
 }
-#include "TsetlinBitset.h"
 
-#define MNIST_AS_TINT_SIZE ((MNIST_IMG_SIZE / TINT_BIT_NUM) + 1)
+#include "TsetlinBitset.h"
 
 struct BinaryMNIST {
     TBitset<MNIST_IMG_SIZE> train_60k[60000];
