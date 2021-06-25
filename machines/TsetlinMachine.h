@@ -1,14 +1,19 @@
 #ifndef TSETLIN_MACHINE_INCLUDE
 #define TSETLIN_MACHINE_INCLUDE
 
+#include <bits/floatn-common.h>
+#include <bits/ranges_algo.h>
+
 #include <algorithm>
 #include <array>
 #include <bitset>
 #include <cstddef>
 #include <iostream>
+#include <limits>
 #include <ostream>
 #include <random>
 
+#include "../utils/NDArray.h"
 #include "../utils/TsetlinBitset.h"
 #include "../utils/TsetlinRand.h"
 
@@ -34,6 +39,8 @@ class TsetlinMachine {
     // Calculated Parameters
     static_assert(!(num_clauses % 2),
                   "The number of clauses must be divisible by 2.");
+    static_assert(!(num_states % 2),
+                  "The number of states must be divisible by 2.");
     static_assert(num_clauses, "The number of clauses must not be zero.");
     static_assert(input_bits, "The number of input bits must not be zero.");
 
@@ -56,8 +63,7 @@ class TsetlinMachine {
     ////////////
 
    public:
-    TsetlinMachine(uint64_t seed = 0)
-        : rgen(TsetlinRandGen(seed)) {
+    TsetlinMachine(uint64_t seed = 0) : rgen(TsetlinRandGen(seed)) {
         for (size_t x = 0; x < automata_per_polarity; x++)
             pos_clause_automata_states[x] = -(rgen.rand() & 1);
         for (size_t x = 0; x < automata_per_polarity; x++)
@@ -171,6 +177,77 @@ class TsetlinMachine {
         return std::max(-iT, std::min(x, iT));
     }
 
+    static TsetlinAutomaton
+    bound_TA(long long x) {
+        static constexpr TsetlinAutomaton max = (num_states / 2) - 1;
+        static constexpr TsetlinAutomaton min = -(num_states / 2);
+        return std::max(min, std::min(x, max));
+    }
+
+    static float
+    t1feedback_table(bool clause, bool literal, bool include) {
+        static constexpr float type1rewards[] = {((S - 1) / S), (1 / S)};
+
+        bool NA = !(clause && !literal && include);
+        return type1rewards[(clause && literal)] * NA;
+    }
+
+    static bool
+    t2feedback_table(bool clause, bool literal, bool include) {
+        return (clause && literal && !include);
+    }
+
+    TsetlinAutomaton
+    update_automaton(TsetlinAutomaton prev_state, bool &t1, bool &t2,
+                     bool clause_output, bool literal, bool include) {
+        long long feedback = 0;
+        if (t1) {
+            feedback += rgen.rand_bernoulli(
+                t1feedback_table(clause_output, literal, include));
+        }
+        if (t2) {
+            feedback += t2feedback_table(clause_output, literal, include);
+        }
+
+        return bound_TA(prev_state + feedback);
+    }
+
+    void
+    backward(TBitset<input_bits> &input, TBitset<input_bits> &input_conjugate,
+             TBitset<clauses_per_polarity> pos_clause_outputs,
+             TBitset<clauses_per_polarity> neg_clause_outputs, int sum,
+             bool desired_output) {
+        TsetlinAutomaton feedback[num_clauses][automata_per_clause];
+        static constexpr size_t _T = summation_target;
+        static constexpr float _2T = 2.0 * _T;
+        float pos_prob = (_T + clip(sum)) / _2T;
+        float neg_prob = (_T - clip(sum)) / _2T;
+        float type1prob = neg_prob;
+        float type2prob = pos_prob;
+
+        // For each positive clause
+        for (size_t cl_num = 0; cl_num < clauses_per_polarity; cl_num++) {
+            bool clause_out = pos_clause_outputs[cl_num];
+
+            // For each automaton in that clause, apply t1 and t2 feedback
+            for (size_t aut_num = 0; aut_num < automata_per_clause; aut_num++) {
+                // Update the the automata corresponding to the input (not the
+                // conjugate).
+                for (size_t i = 0; i < input_bits; i++)
+                    ;
+                // Update the the automata corresponding to the input's
+                // conjugate.
+            }
+        }
+
+        // For each in negative clauses, apply t1 and t2 feedback
+        for () {
+        }
+    }
+
+    void
+    backward_clause() {}
+
     bool
     forward_backward(TBitset<input_bits> &input, bool desired_output) {
         /////////////
@@ -202,6 +279,8 @@ class TsetlinMachine {
         static constexpr float _2T = 2.0 * _T;
         float pos_prob = (_T + clip(sum)) / _2T;
         float neg_prob = (_T - clip(sum)) / _2T;
+        float type1prob = neg_prob;
+        float type2prob = pos_prob;
 
         static constexpr size_t halfway = num_clauses / 2;
         for (size_t j = 0; j < halfway; j++) {

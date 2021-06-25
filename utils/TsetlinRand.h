@@ -14,7 +14,7 @@ class TsetlinRandGen {
 
    public:
     uint64_t state;
-    
+
     inline TsetlinRandGen(uint64_t seed = 0xabcdef0123456789) { state = seed; }
 
     uint64_t
@@ -29,7 +29,7 @@ class TsetlinRandGen {
 
     uint32_t
     rand_32() noexcept {
-        uint32_t x = state;
+        uint32_t x = (uint32_t)state;
         // TODO WHAT WERE THESE SUPPOSED TO BE FOR 32 BIT
         x ^= x << 13;
         x ^= x >> 7;
@@ -81,7 +81,8 @@ class TsetlinRandGen {
     biased_bits(TBitset<bits>& to_pack) {
         size_t backing_buf_size = to_pack.backing_size();
         tint* backing = to_pack.get_backing();
-        for (size_t i = 0; i < to_pack; i++) ;
+        for (size_t i = 0; i < to_pack; i++)
+            ;
     }
 };
 

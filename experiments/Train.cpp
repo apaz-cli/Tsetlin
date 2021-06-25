@@ -1,9 +1,9 @@
 #include <memory>
 
+#include "../machines/MultiClassTsetlinMachine.h"
+#include "../machines/TsetlinMachine.h"
 #include "../utils/BinaryMNIST.h"
-#include "MultiClassTsetlinMachine.h"
-#include "TsetlinBitset.h"
-#include "TsetlinMachine.h"
+#include "../utils/TsetlinBitset.h"
 
 #define EPOCHS 400
 #define NUM_TRAIN 60000
@@ -46,6 +46,5 @@ main() {
             bool res = model->forward(img);
             if (label == res) correct++;
         }
-        
     }
 }

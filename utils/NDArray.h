@@ -36,11 +36,6 @@ class NDArray {
     // clang-format on
 
    public:
-    constexpr static size_t
-    safe_mult(const size_t l, const size_t r) noexcept {
-        return l * r;
-    }
-
     T*
     get_backing() {
         return arr;
@@ -73,6 +68,10 @@ class NDArray {
 
         return idx;
     }
+
+    /////////
+    // GET //
+    /////////
 
     size_t
     get() requires(dimensions == 0) { return arr[0]; }
@@ -116,6 +115,34 @@ class NDArray {
         return arr[index1d(arg1, args...)];
     }
     // clang-format on
+
+    /////////
+    // SET //
+    /////////
+
+    void
+    set(T value) requires(dimensions == 0) {
+        arr[0] = value;
+    }
+
+    template <std::convertible_to<std::size_t>... Args>
+    requires(sizeof...(Args) == dimensions - 1) size_t
+        set(T value, size_t arg1, Args... args) noexcept {
+        arr[index1d(arg1, args...)] = value;
+    }
+
+    void
+    set_checked(T value) requires(dimensions == 0) {
+        arr[0] = value;
+    }
+
+    template <std::convertible_to<std::size_t>... Args>
+    requires(sizeof...(Args) == dimensions - 1) void set_checked(T value,
+                                                                 size_t arg1,
+                                                                 Args... args) {
+        bounds_check(arg1, args...);
+        arr[index1d(arg1, args...)] = value;
+    }
 };
 
 #endif  // NDARRAY_INCLUDE
