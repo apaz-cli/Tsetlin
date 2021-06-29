@@ -108,7 +108,7 @@ class TBitset {
         // return inverse value
         bool
         operator~() const noexcept {
-            return ~((bool)this);
+            return !((bool)this);
         }
     };
 
@@ -151,9 +151,9 @@ class TBitset {
         return sum;
     }
 
-    std::array<tint, buf_len>&
+    const std::array<tint, buf_len>&
     get_backing() const noexcept {
-        return *(this->buf);
+        return buf;
     }
 
     constexpr size_t

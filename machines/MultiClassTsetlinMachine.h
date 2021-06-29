@@ -1,7 +1,9 @@
-#include "TsetlinMachine.h"
 
-#ifndef TSETLIN_MACHINE_INCLUDE
-#define TSETLIN_MACHINE_INCLUDE
+
+#ifndef MULTICLASS_TSETLIN_MACHINE_INCLUDE
+#define MULTICLASS_TSETLIN_MACHINE_INCLUDE
+
+#include "TsetlinMachine.h"
 
 #ifndef ARGMAX_TIEBREAK
 #define AM_LAST 0
@@ -10,12 +12,9 @@
 #define ARGMAX_TIEBREAK AM_LAST
 #endif  // ARGMAX_TIEBREAK
 
-template <size_t num_classes, size_t input_bits, size_t num_clauses,
-          size_t summation_target, float S, typename TsetlinAutomaton = char,
-          size_t num_states = 128>
+template <size_t num_classes, typename config>
 class MultiClassTsetlinMachine {
-    TsetlinMachine<input_bits, num_clauses, summation_target, S,
-                   TsetlinAutomaton, num_states>
+    TsetlinMachine<config>
         machines[num_classes];
 };
 

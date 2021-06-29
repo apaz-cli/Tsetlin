@@ -5,8 +5,6 @@
 #include "../utils/TsetlinBitset.h"
 #include "../machines/TsetlinMachine.h"
 
-
-
 int main() {
     //std::array<tint, 30> input;
     //auto tm = TsetlinMachine<30, 64, 10>();

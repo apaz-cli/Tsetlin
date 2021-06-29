@@ -13,5 +13,16 @@
   "directory": "/home/apaz/git/Tsetlin/tests",
   "command": "/bin/clang++ -o a.out1 -c TRandTest.cpp --std=c++20 -Wall -Wextra -Wpedantic -Wimplicit",
   "file": "TRandTest.cpp"
+},
+
+{
+  "directory": "/home/apaz/git/Tsetlin/experiments",
+  "command": "/bin/clang++ -o a.out1 -c Main.cpp --std=c++20 -Wall -Wextra -Wpedantic -Wimplicit",
+  "file": "Main.cpp"
+},
+{
+  "directory": "/home/apaz/git/Tsetlin/experiments",
+  "command": "/bin/clang++ -o a.out1 -c Train.cpp --std=c++20 -Wall -Wextra -Wpedantic -Wimplicit",
+  "file": "Train.cpp"
 }
 ]

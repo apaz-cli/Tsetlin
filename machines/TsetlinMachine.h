@@ -1,11 +1,9 @@
 #ifndef TSETLIN_MACHINE_INCLUDE
 #define TSETLIN_MACHINE_INCLUDE
 
-#include <bits/floatn-common.h>
-#include <bits/ranges_algo.h>
-
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <bitset>
 #include <cstddef>
 #include <iostream>
@@ -34,13 +32,22 @@ class TsetlinMachine {
     static constexpr size_t summation_target = config::summation_target;
     static constexpr float S = config::S;
     static constexpr size_t num_states = config::num_states;
-    using TsetlinAutomaton = decltype(config::TsetlinAutomaton);
 
-    // Calculated Parameters
+    using TsetlinAutomaton = decltype(config::TsetlinAutomaton);
+    static constexpr TsetlinAutomaton TA_max = (num_states / 2) - 1;
+    static constexpr TsetlinAutomaton TA_min = -(num_states / 2);
+
+    // Assert parameters
     static_assert(!(num_clauses % 2),
                   "The number of clauses must be divisible by 2.");
     static_assert(!(num_states % 2),
                   "The number of states must be divisible by 2.");
+    static_assert(
+        std::numeric_limits<TsetlinAutomaton>::min() <= TA_min,
+        "The number of states in a Tsetlin machine must fall within limits.");
+    static_assert(
+        std::numeric_limits<TsetlinAutomaton>::max() <= TA_max,
+        "The number of states in a Tsetlin machine must fall within limits.");
     static_assert(num_clauses, "The number of clauses must not be zero.");
     static_assert(input_bits, "The number of input bits must not be zero.");
 
@@ -48,51 +55,48 @@ class TsetlinMachine {
     // State //
     ///////////
 
-    // TsetlinAutomaton automata_states[num_clauses][num_automata];
+    // Random generator. Seeded in constructor.
     TsetlinRandGen rgen;
-    TsetlinAutomaton pos_clause_automata_states[automata_per_polarity];
-    TsetlinAutomaton neg_clause_automata_states[automata_per_polarity];
+
+    // Clause Layout:
+    // pos, neg, pos, neg, ... (polarity = i % 2 ? 'pos', 'neg')
+    // Automaton Layout in each clause:
+    // inp, ~inp, inp, ~inp, ... (Where each bundle of these is TINT_SIZE long.)
+    static constexpr size_t automata_states_len =
+        num_clauses * automata_per_clause;
+    TsetlinAutomaton automata_states[automata_states_len];
 
     inline TsetlinAutomaton *
-    automataForClause(TsetlinAutomaton *states, size_t clause_num) {
-        return states + (automata_per_clause * clause_num);
+    automataForClause(size_t clause_num) {
+        return automata_states + (automata_per_clause * clause_num);
     }
 
-    ////////////
-    // Methods//
-    ////////////
+    /////////////
+    // Methods //
+    /////////////
 
    public:
     TsetlinMachine(uint64_t seed = 0) : rgen(TsetlinRandGen(seed)) {
-        for (size_t x = 0; x < automata_per_polarity; x++)
-            pos_clause_automata_states[x] = -(rgen.rand() & 1);
-        for (size_t x = 0; x < automata_per_polarity; x++)
-            neg_clause_automata_states[x] = -(rgen.rand() & 1);
-    }
-
-    void
-    literals_forward(TBitset<input_bits> &input,
-                     TBitset<input_bits> &input_conjugate) {
-        input_conjugate = ~input;
+        for (size_t x = 0; x < automata_states_len; x++)
+            automata_states[x] = -(rgen.rand() & 1);
     }
 
     bool
-    clause_forward(
-        TsetlinAutomaton *clause_automata, TBitset<input_bits> &input,
-        TBitset<input_bits> &input_conjugate,
-        TBitset<automata_per_clause> &automata_results) const noexcept {
+    clause_forward(TsetlinAutomaton *clause_automata,
+                   TBitset<input_bits> &input) const noexcept {
         // Evaluate the automata and pack into bitset.
-        // The results are an "inclusion mask" for our input vectors.
+        // The results are an "inclusion mask" for the clause.
+        TBitset<automata_per_clause> automata_results;
         for (size_t i = 0; i < automata_per_clause; i++)
             automata_results[i] = (clause_automata[i] >= 0) ? 1 : 0;
 
-        // Compute the following truth table, TINT_BIT_NUM bits at a time.
-        // This is faster than using the builtin operators.
-        // clang-format off
-        std::array<tint, input_bits>& input_b = input.get_backing();
-        std::array<tint, input_bits>& input_conj_b = input_conjugate.get_backing();
-        std::array<tint, automata_per_polarity>& inc_b = automata_results.get_backing();
-        // clang-format on
+        // Get the bits
+        const std::array<tint, (input_bits / TINT_BIT_NUM) +
+                                   ((input_bits % TINT_BIT_NUM) != 0)>
+            &input_b = input.get_backing();
+        const std::array<tint, (automata_per_clause / TINT_BIT_NUM) +
+                                   ((automata_per_clause % TINT_BIT_NUM) != 0)>
+            &inc_b = automata_results.get_backing();
 
         //            inp
         //          1     0
@@ -102,47 +106,79 @@ class TsetlinMachine {
         //     0 X  1  |  1  X
         //       X-----X-----X
 
-        tint ret = TINT_MAX;  // 32 or 64 1s
-        for (size_t i = 0; i < input.backing_size(); i++) {
-            tint inc = inc_b[i];
-            tint inp = input_b[i];
-            ret &= (~inc | inp);
+        // Compute the table for the inp, and also for ~inp and its
+        // corresponding automata.
+
+        tint ret = TINT_MAX;  // 32 or 64 1s, depending on archetecture.
+        for (size_t i = 0, j = 0; i < input.backing_size(); i++, j++) {
+            tint inc_pos = inc_b[j];
+            tint inc_neg = inc_b[++j];
+            tint inp_pos = input_b[i];
+            tint inp_neg = ~input_b[i];
+            tint table_inp = (~inc_pos | inp_pos);
+            tint table_inp_conj = (~inc_neg | inp_neg);
+            ret &= table_inp & table_inp_conj;
         }
 
-        // Returning from inside the loop slaughters the compiler.
-        // If we've already ANDed a zero, return.
-        if (ret != TINT_MAX) return 0;
-
-        // Now do the same with the conjugate
-        for (size_t i = 0; i < input_conjugate.backing_size(); i++) {
-            tint inc = inc_b[input.backing_size() + i];
-            tint inp = input_conj_b[i];
-            ret &= (~inc | inp);
-        }
-
-        return (ret != TINT_MAX) ? 0 : 1;
+        // If a 0 never appeared in the clause, return 1. Otherwise, return 0.
+        // I forget if returning the comparison directly is undefined behavior
+        // or not, so I'mma just play it safe and it'll get optimized away.
+        return (ret == TINT_MAX) ? 1 : 0;
     }
 
     void
-    clauses_forward(TBitset<input_bits> &input,
-                    TBitset<input_bits> &input_conjugate,
-                    TBitset<clauses_per_polarity> &pos_output,
-                    TBitset<clauses_per_polarity> &neg_output) {
-        TBitset<automata_per_clause> automata_results;
-        for (size_t i = 0; i < clauses_per_polarity; i++)
-            pos_output[i] =
-                clause_forward(automataForClause(pos_clause_automata_states, i),
-                               input, input_conjugate, automata_results);
-        for (size_t i = 0; i < clauses_per_polarity; i++)
-            neg_output[i] =
-                clause_forward(automataForClause(neg_clause_automata_states, i),
-                               input, input_conjugate, automata_results);
+    clauses_forward(TBitset<input_bits> &input, TBitset<num_clauses> &output) {
+        for (size_t i = 0; i < num_clauses; i++)
+            output[i] = clause_forward(automataForClause(i), input);
     }
 
     static int
-    summation_forward(TBitset<clauses_per_polarity> &pos_clause_outputs,
-                      TBitset<clauses_per_polarity> &neg_clause_outputs) {
-        return pos_clause_outputs.count() - neg_clause_outputs.count();
+    summation_forward(TBitset<num_clauses> &clause_outputs) {
+        static constexpr size_t size = num_clauses;
+        static constexpr size_t halfway = size / 2;  // num_clauses % 2 == 0
+        static constexpr size_t backing_size =
+            (num_clauses / TINT_BIT_NUM) + ((num_clauses % TINT_BIT_NUM) != 0);
+        static constexpr size_t middle_idx = backing_size / 2;
+
+        static constexpr size_t split_idx = halfway % TINT_BIT_NUM;
+        static constexpr bool clean =
+            (backing_size % 2 == 0) && (split_idx == 0);
+
+        static constexpr size_t r1_begin = 0;
+        static constexpr size_t r1_end = middle_idx;
+        static constexpr size_t r2_begin = middle_idx + !clean;
+        static constexpr size_t r2_end = backing_size;
+
+        const std::array<tint, backing_size> &backing =
+            clause_outputs.get_backing();
+        int sum = 0;
+
+        if constexpr (clean) {
+            // Case: The boundary between positive and negative clause outputs
+            // is the boundary of a buffer.
+            for (size_t i = r1_begin; i < r1_end; i++)
+                sum += std::popcount<size_t>(backing[i]);
+            for (size_t i = r2_begin; i < r2_end; i++)
+                sum -= std::popcount<size_t>(backing[i]);
+            return sum;
+        } else {
+            // Case: The boundary between positive and negative clause outputs
+            // is inside a buffer.
+            int sum = 0;
+            for (size_t i = r1_begin; i < r1_end; i++)
+                sum += std::popcount<size_t>(backing[i]);
+
+            // Deal with the middle
+            for (size_t j = 0; j < split_idx; j++)
+                sum += (backing[middle_idx] & (1 << j)) ? 1 : 0;
+            for (size_t j = 0; j < split_idx; j++)
+                sum -= (backing[middle_idx] & (1 << j)) ? 1 : 0;
+
+            for (size_t i = r2_begin; i < r2_end; i++)
+                sum -= std::popcount<size_t>(backing[i]);
+
+            return sum;
+        }
     }
 
     static bool
@@ -151,20 +187,21 @@ class TsetlinMachine {
     }
 
     bool
-    forward(TBitset<input_bits> &input) {
-        // Literals forward
-        std::array<tint, 0> input_conjugate;
-        literals_forward(input, input_conjugate);
-
+    ctm_forward(TBitset<input_bits> &input) {
         // Clauses forward
-        std::array<bool, num_clauses> clause_outputs;
-        clauses_forward_bool(input, input_conjugate, clause_outputs);
+        TBitset<num_clauses> clause_outputs;
+        clauses_forward(input, clause_outputs);
 
         // Summation forward
-        int sum = summation_forward_bool(clause_outputs);
+        int sum = summation_forward(clause_outputs);
 
         // Threshold
         return threshold_forward(sum);
+    }
+
+    bool
+    operator()(TBitset<input_bits> &input) {
+        return ctm_forward(input);
     }
 
     ///////////////
@@ -179,9 +216,8 @@ class TsetlinMachine {
 
     static TsetlinAutomaton
     bound_TA(long long x) {
-        static constexpr TsetlinAutomaton max = (num_states / 2) - 1;
-        static constexpr TsetlinAutomaton min = -(num_states / 2);
-        return std::max(min, std::min(x, max));
+        return std::max<TsetlinAutomaton>(
+            TA_min, std::min<TsetlinAutomaton>(x, TA_max));
     }
 
     static float
@@ -198,8 +234,8 @@ class TsetlinMachine {
     }
 
     TsetlinAutomaton
-    update_automaton(TsetlinAutomaton prev_state, bool &t1, bool &t2,
-                     bool clause_output, bool literal, bool include) {
+    calculate_feedback(TsetlinAutomaton prev_state, bool t1, bool t2,
+                       bool clause_output, bool literal, bool include) {
         long long feedback = 0;
         if (t1) {
             feedback += rgen.rand_bernoulli(
@@ -213,35 +249,45 @@ class TsetlinMachine {
     }
 
     void
-    backward(TBitset<input_bits> &input, TBitset<input_bits> &input_conjugate,
-             TBitset<clauses_per_polarity> pos_clause_outputs,
-             TBitset<clauses_per_polarity> neg_clause_outputs, int sum,
-             bool desired_output) {
-        TsetlinAutomaton feedback[num_clauses][automata_per_clause];
+    ctm_backward(TBitset<input_bits> &input,
+                 TBitset<num_clauses> clause_outputs, int sum,
+                 bool desired_output) {
+        // Calculate probability of feedback
         static constexpr size_t _T = summation_target;
         static constexpr float _2T = 2.0 * _T;
-        float pos_prob = (_T + clip(sum)) / _2T;
-        float neg_prob = (_T - clip(sum)) / _2T;
-        float type1prob = neg_prob;
-        float type2prob = pos_prob;
+        float type1prob = (_T - clip(sum)) / _2T;
+        float type2prob = (_T + clip(sum)) / _2T;
 
-        // For each positive clause
-        for (size_t cl_num = 0; cl_num < clauses_per_polarity; cl_num++) {
-            bool clause_out = pos_clause_outputs[cl_num];
+        // For each clause
+        for (size_t cl_num = 0; cl_num < num_clauses; cl_num++) {
+            bool clause_out = clause_outputs[cl_num];
+            TsetlinAutomaton *clause_automata = automataForClause(cl_num);
 
-            // For each automaton in that clause, apply t1 and t2 feedback
-            for (size_t aut_num = 0; aut_num < automata_per_clause; aut_num++) {
-                // Update the the automata corresponding to the input (not the
-                // conjugate).
-                for (size_t i = 0; i < input_bits; i++)
-                    ;
-                // Update the the automata corresponding to the input's
-                // conjugate.
+            // For each automaton in the clause, apply t1 and t2 feedback
+            bool t1 = rgen.rand_bernoulli(type1prob);
+            bool t2 = rgen.rand_bernoulli(type2prob);
+            for (size_t i = 0, j = 0; i < input_bits; i++, j++) {
+                // Update the the automata in the clause corresponding to the
+                // input.
+
+                // Inputs and their conjugates are updated at the same time.
+                // Variables eding in _  correspond to conjugates.
+
+                TsetlinAutomaton *current_state_pos = clause_automata + j;
+                TsetlinAutomaton *current_state_pos_ = clause_automata + (++j);
+                TsetlinAutomaton current_state = *current_state_pos;
+                TsetlinAutomaton current_state_ = *current_state_pos_;
+
+                TsetlinAutomaton new_state =
+                    calculate_feedback(current_state, t1, t2, clause_out,
+                                       input[i], current_state >= 0 ? 1 : 0);
+                TsetlinAutomaton new_state_ =
+                    calculate_feedback(current_state_, t1, t2, clause_out,
+                                       ~input[i], current_state_ >= 0 ? 1 : 0);
+
+                *current_state_pos = new_state;
+                *current_state_pos_ = new_state_;
             }
-        }
-
-        // For each in negative clauses, apply t1 and t2 feedback
-        for () {
         }
     }
 
@@ -249,63 +295,23 @@ class TsetlinMachine {
     backward_clause() {}
 
     bool
-    forward_backward(TBitset<input_bits> &input, bool desired_output) {
+    ctm_forward_backward(TBitset<input_bits> &input, bool desired_output) {
         /////////////
         // Forward //
         /////////////
 
-        // Literals forward
-        TBitset<input_bits> input_conjugate = TBitset<input_bits>();
-        literals_forward(input, input_conjugate);
-
         // Clauses forward
-        TBitset<clauses_per_polarity> pos_clause_outputs;
-        TBitset<clauses_per_polarity> neg_clause_outputs;
-        clauses_forward(input, input_conjugate, pos_clause_outputs,
-                        neg_clause_outputs);
+        TBitset<num_clauses> clause_outputs;
+        clauses_forward(input, clause_outputs);
 
         // Summation forward
-        int sum = summation_forward(pos_clause_outputs, neg_clause_outputs);
+        int sum = summation_forward(clause_outputs);
 
         // Threshold
         bool output = threshold_forward(sum);
 
-        //////////////
-        // Backward //
-        //////////////
-
-        TsetlinAutomaton feedback[num_clauses][automata_per_clause];
-        static constexpr size_t _T = summation_target;
-        static constexpr float _2T = 2.0 * _T;
-        float pos_prob = (_T + clip(sum)) / _2T;
-        float neg_prob = (_T - clip(sum)) / _2T;
-        float type1prob = neg_prob;
-        float type2prob = pos_prob;
-
-        static constexpr size_t halfway = num_clauses / 2;
-        for (size_t j = 0; j < halfway; j++) {
-            if (output) {
-                // type 1 to positive clause
-                if (rgen.rand_bernoulli(pos_prob)) {
-                }
-            } else {
-                // type 2 to positive clause
-                if (rgen.rand_bernoulli(neg_prob)) {
-                }
-            }
-        }
-
-        for (size_t j = halfway; j < num_clauses; j++) {
-            if (output) {
-                // type 2 to negative clause
-                if (rgen.rand_bernoulli(neg_prob)) {
-                }
-            } else {
-                // type 1 to negative clause
-                if (rgen.rand_bernoulli(pos_prob)) {
-                }
-            }
-        }
+        // Update TM teams
+        ctm_backward(input, clause_outputs, sum, desired_output);
 
         return output;
     }
