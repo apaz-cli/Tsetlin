@@ -46,13 +46,13 @@ struct BinaryMNIST {
         free(label_10k);
     }
 
-    TBitset<MNIST_IMG_SIZE>*
+    TBitset<MNIST_IMG_SIZE>&
     train(size_t i) {
-        return train_60k + i;
+        return train_60k[i];
     }
-    TBitset<MNIST_IMG_SIZE>*
+    TBitset<MNIST_IMG_SIZE>&
     test(size_t i) {
-        return test_10k + i;
+        return test_10k[i];
     }
     unsigned char
     train_label(size_t i) {

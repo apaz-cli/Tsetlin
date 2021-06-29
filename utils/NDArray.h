@@ -1,6 +1,6 @@
 #ifndef NDARRAY_INCLUDE
 #define NDARRAY_INCLUDE
-#include <bits/c++config.h>
+
 
 #include <concepts>
 #include <cstddef>

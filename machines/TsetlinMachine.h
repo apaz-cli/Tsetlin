@@ -261,22 +261,23 @@ class TsetlinMachine {
         // For each clause
         for (size_t cl_num = 0; cl_num < num_clauses; cl_num++) {
             bool clause_out = clause_outputs[cl_num];
-            TsetlinAutomaton *clause_automata = automataForClause(cl_num);
+            TsetlinAutomaton *automata_for_clause = automataForClause(cl_num);
 
             // For each automaton in the clause, apply t1 and t2 feedback
             bool t1 = rgen.rand_bernoulli(type1prob);
             bool t2 = rgen.rand_bernoulli(type2prob);
-            for (size_t i = 0, j = 0; i < input_bits; i++, j++) {
+            for (size_t i = 0, j = 0; i < input_bits; i += 1, j += 2) {
                 // Update the the automata in the clause corresponding to the
                 // input.
 
                 // Inputs and their conjugates are updated at the same time.
                 // Variables eding in _  correspond to conjugates.
-
-                TsetlinAutomaton *current_state_pos = clause_automata + j;
-                TsetlinAutomaton *current_state_pos_ = clause_automata + (++j);
+                // clang-format off
+                TsetlinAutomaton *current_state_pos = automata_for_clause + j;
+                TsetlinAutomaton *current_state_pos_ = automata_for_clause + j + 1;
                 TsetlinAutomaton current_state = *current_state_pos;
                 TsetlinAutomaton current_state_ = *current_state_pos_;
+                // clang-format on
 
                 TsetlinAutomaton new_state =
                     calculate_feedback(current_state, t1, t2, clause_out,
@@ -290,9 +291,6 @@ class TsetlinMachine {
             }
         }
     }
-
-    void
-    backward_clause() {}
 
     bool
     ctm_forward_backward(TBitset<input_bits> &input, bool desired_output) {
