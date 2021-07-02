@@ -1,5 +1,5 @@
 extern "C" {
-#include "../MNIST-dataloader-for-C/mnist.h"
+#include "MNIST-dataloader-for-C/mnist.h"
 }
 
 #include "TsetlinBitset.h"

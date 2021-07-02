@@ -6,7 +6,7 @@
 #include <memory>
 #include <ostream>
 
-#include "../machines/MultiClassTsetlinMachine.h"
+// #include "../machines/MultiClassTsetlinMachine.h"
 #include "../machines/TsetlinMachine.h"
 #include "../utils/BinaryMNIST.h"
 #include "../utils/TsetlinBitset.h"
@@ -28,13 +28,18 @@ class TsetlinConfig {
     static char TsetlinAutomaton;
 };
 
+static constexpr bool progress_print = 0;
+
 static inline void
 print_progress(const char* train_test, size_t current, size_t num_train,
                size_t num_accurate) {
-    printf("\r%s epoch progress: %zu/%zu, epoch accuracy: %zu/%zu, (%.2f%%)",
-           train_test, current, num_train, num_accurate, current,
-           100.0 * (float)num_accurate / (float)current);
-    fflush(stdout);
+    if (progress_print) {
+        printf(
+            "\r%s epoch progress: %zu/%zu, epoch accuracy: %zu/%zu, (%.2f%%)",
+            train_test, current, num_train, num_accurate, current,
+            100.0 * (float)num_accurate / (float)current);
+        fflush(stdout);
+    }
 }
 
 static inline void
@@ -46,43 +51,42 @@ print_epoch(size_t epoch_num, size_t num_accurate, size_t num_test,
     auto valid_duration =
         std::chrono::duration_cast<std::chrono::minutes>(valid_end - train_end)
             .count();
-    auto total_duration =
-        std::chrono::duration_cast<std::chrono::minutes>(valid_end - train_end)
-            .count();
+    auto total_duration = std::chrono::duration_cast<std::chrono::minutes>(
+                              valid_end - epoch_start)
+                              .count();
 
-    std::cout << "\rFinished epoch " << epoch_num
-              << ".\nAccuracy: " << num_accurate << '/' << num_test << " ("
+    std::cout << "\r============================="
+              << "\nFinished epoch " << epoch_num << '.'
+              << "\nAccuracy: " << num_accurate << '/' << num_test << " ("
               << 100.0 * (float)num_accurate / (float)num_test << "%)"
-              << "\nTrain time:" << train_duration
-              << "\nValidation time: " << valid_duration
-              << "\nTotal time: " << total_duration << std::endl;
+              << "\nTrain time: " << train_duration << " minutes."
+              << "\nValidation time: " << valid_duration << " minutes."
+              << "\nTotal time: " << total_duration << " minutes.\n" << std::endl;
 }
 
 int
 main() {
-    char folder[] = "../MNIST-dataloader-for-C/data/";
+    // Dataset
+    char folder[] = "../utils/MNIST-dataloader-for-C/data/";
     auto bmnist = std::unique_ptr<BinaryMNIST>(new BinaryMNIST(folder));
-    std::cout << "Loaded dataset." << std::endl;
-    std::flush(std::cout);
 
+    // Model
     TsetlinMachine<TsetlinConfig>* model = new TsetlinMachine<TsetlinConfig>();
-    std::cout << "Initialized model." << std::endl;
-    std::flush(std::cout);
 
     for (size_t epoch = 0; epoch < EPOCHS; epoch++) {
         auto epoch_start_time = std::chrono::high_resolution_clock::now();
 
         // Train loop
-        size_t num_accurate = 0;
+    size_t num_accurate = 0;
         for (size_t i = 0; i < bmnist->num_train; i++) {
             TBitset<MNIST_IMG_SIZE>& img = bmnist->train(i);
             unsigned char label = bmnist->train_label(i);
-            bool output = model->ctm_forward_backward(img, label);
 
-            num_accurate += output == label ? 1 : 0;
+            bool output = model->forward_backward(img);
 
-            if (!(i % 500))
-                print_progress("Train", i, bmnist->num_train, num_accurate);
+            num_accurate += output == (bool)label ? 1 : 0;
+
+            print_progress("Train", i, bmnist->num_train, num_accurate);
         }
 
         auto train_end_time = std::chrono::high_resolution_clock::now();
@@ -92,12 +96,11 @@ main() {
         for (size_t i = 0; i < bmnist->num_test; i++) {
             TBitset<MNIST_IMG_SIZE>& img = bmnist->test(i);
             unsigned char label = bmnist->test_label(i);
-            bool output = model->ctm_forward(img);
+            bool output = model->forward(img);
 
-            num_accurate += output == label ? 1 : 0;
+            num_accurate += output == (bool)label ? 1 : 0;
 
-            if (!(i % 500))
-                print_progress("Test", i, bmnist->num_test, num_accurate);
+            print_progress("Test", i, bmnist->num_test, num_accurate);
         }
 
         auto test_end_time = std::chrono::high_resolution_clock::now();

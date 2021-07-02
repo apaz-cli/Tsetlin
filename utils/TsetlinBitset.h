@@ -5,7 +5,7 @@
 #include <bit>
 #include <bitset>
 #include <cstddef>
-#include <iostream>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 
@@ -17,8 +17,12 @@
 #define TINT_PRI "%" PRIu64
 #define TINT_BIT_NUM 64
 #define TINT_MAX 0xFFFFFFFFFFFFFFFF
+#define TINT_INTERLEAVE_MASK_0 0x5555555555555555
+#define TINT_INTERLEAVE_MASK_1 0x3333333333333333
+#define TINT_INTERLEAVE_MASK_2 0x0F0F0F0F0F0F0F0F
+#define TINT_INTERLEAVE_MASK_3 0x00FF00FF00FF00FF
+#define TINT_NEG_MASK 0x
 #define tint uint64_t
-#define tint_count(x) __builtin_popcountl(x)
 static_assert(
     sizeof(uint64_t) == sizeof(unsigned long),
     "sizeof(uint64_t) != sizeof(unsigned long). Please edit TsetlinBitset.h.");
@@ -26,24 +30,35 @@ static_assert(
 #define TINT_PRI "%" PRIu32
 #define TINT_BIT_NUM 32
 #define TINT_MAX 0xFFFFFFFF
+#define TINT_MASK_0 0x55555555
+#define TINT_MASK_1 0x33333333
+#define TINT_MASK_2 0x0F0F0F0F
+#define TINT_MASK_3 0x00FF00FF
 #define tint uint32_t
-#define tint_count(x) __builtin_popcount(x)
 static_assert(
     sizeof(uint32_t) == sizeof(unsigned int),
     "sizeof(uint32_t) != sizeof(unsigned int). Please edit TsetlinBitset.h.");
 #endif  // BITNUM
 
+// For friendship
+class TsetlinRandGen;
+
 // Because of efficiency over the STL version
 template <size_t num_bits>
 class TBitset {
-    constexpr static size_t buf_len =
-        (num_bits / TINT_BIT_NUM) + ((num_bits % TINT_BIT_NUM) != 0);
-
     friend class BitRef;
-    // Members
-    std::array<tint, buf_len> buf;
+    friend class TsetlinRanTsetlinRandGen;
 
    public:
+
+    /////////////
+    // Members //
+    /////////////
+    constexpr static size_t buf_len =
+        (num_bits / TINT_BIT_NUM) + ((num_bits % TINT_BIT_NUM) != 0);
+        
+    tint buf[buf_len];
+
     ///////////////////
     // Inner Classes //
     ///////////////////
@@ -122,7 +137,7 @@ class TBitset {
     TBitset(bool zeros = false) noexcept
         requires((num_bits % TINT_BIT_NUM) != 0) {
         if (zeros)
-            buf.fill(0);
+            for (size_t i = 0; i < buf_len; i++) buf[i] = 0;
         else if (buf_len % TINT_BIT_NUM)
             buf[buf_len - 1] = 0;
     }
@@ -149,11 +164,6 @@ class TBitset {
         for (size_t i = 0; i < buf_len; i++)
             sum += std::popcount<tint>(this->buf[i]);
         return sum;
-    }
-
-    const std::array<tint, buf_len>&
-    get_backing() const noexcept {
-        return buf;
     }
 
     constexpr size_t
