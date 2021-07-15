@@ -17,7 +17,6 @@
 #include <sstream>
 
 #include "../utils/Benchmarker.h"
-#include "../utils/Morton.h"
 #include "../utils/TsetlinBitset.h"
 #include "../utils/TsetlinRand.h"
 
