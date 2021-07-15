@@ -385,7 +385,7 @@ class TsetlinMachine {
 
     static inline TsetlinAutomaton
     t1feedback_is_penalty(bool clause, bool literal, bool include) {
-        char options[] = {1, -1};
+        char options[] = {(TsetlinAutomaton)1, (TsetlinAutomaton)-1};
         return options[((clause & literal) ^ include)];
     }
 
@@ -415,13 +415,15 @@ class TsetlinMachine {
                      bool literal, bool include) {
         // Sample from the table
         TsetlinAutomaton t1_reward =
-            rgen.rand_bernoulli(t1feedback_table(clause_output, literal, include)) *
+            rgen.rand_bernoulli(
+                t1feedback_table(clause_output, literal, include)) *
             t1feedback_is_penalty(clause_output, literal, include);
 
         // Apply the reward or penalty in the correct direction.
         // If the automaton is positive, a reward adds, and a penalty subtracts.
         // If the automaton is negative, a reward subtracts, and a penalty adds.
-        static constexpr TsetlinAutomaton directions[] = {-1, 1};
+        static constexpr TsetlinAutomaton directions[] = {(TsetlinAutomaton)-1,
+                                                          (TsetlinAutomaton)1};
         t1_reward *= directions[include];
 
         // Apply the feedback to the current state and return the new state.
