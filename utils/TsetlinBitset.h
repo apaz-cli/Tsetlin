@@ -13,7 +13,6 @@
 #define BITNUM 64
 #endif
 
-#if BITNUM == 64
 #define TINT_PRI "%" PRIu64
 #define TINT_BIT_NUM 64
 #define TINT_MAX 0xFFFFFFFFFFFFFFFF
@@ -23,22 +22,6 @@
 #define TINT_INTERLEAVE_MASK_3 0x00FF00FF00FF00FF
 #define TINT_NEG_MASK 0x
 #define tint uint64_t
-static_assert(
-    sizeof(uint64_t) == sizeof(unsigned long),
-    "sizeof(uint64_t) != sizeof(unsigned long). Please edit TsetlinBitset.h.");
-#else
-#define TINT_PRI "%" PRIu32
-#define TINT_BIT_NUM 32
-#define TINT_MAX 0xFFFFFFFF
-#define TINT_MASK_0 0x55555555
-#define TINT_MASK_1 0x33333333
-#define TINT_MASK_2 0x0F0F0F0F
-#define TINT_MASK_3 0x00FF00FF
-#define tint uint32_t
-static_assert(
-    sizeof(uint32_t) == sizeof(unsigned int),
-    "sizeof(uint32_t) != sizeof(unsigned int). Please edit TsetlinBitset.h.");
-#endif  // BITNUM
 
 // For friendship
 class TsetlinRandGen;
@@ -50,13 +33,12 @@ class TBitset {
     friend class TsetlinRanTsetlinRandGen;
 
    public:
-
     /////////////
     // Members //
     /////////////
     constexpr static size_t buf_len =
         (num_bits / TINT_BIT_NUM) + ((num_bits % TINT_BIT_NUM) != 0);
-        
+
     tint buf[buf_len];
 
     ///////////////////
@@ -83,7 +65,7 @@ class TBitset {
         // convert to bool
         operator bool() const noexcept {
             tint b = owner.buf[buf_idx];
-            b &= (1 << offset);
+            b &= ((tint)1 << offset);
             return b ? 1 : 0;
         }
         // assign bool
@@ -93,11 +75,11 @@ class TBitset {
             tint orig = owner.buf[buf_idx];
             // Create 0s, except for one 1 at the offset position.
             // Negate, creating 1s, except for one 0 at the offset position.
-            tint negmask = ~(1 << offset);
+            tint negmask = ~((tint)1 << offset);
             // Set the bit in the original at the offset to 0.
             orig &= negmask;
             // xor x to assign x to the offset bit. (xor identity)
-            orig ^= (x << offset);
+            orig ^= ((tint)x << offset);
             // Put back in the buffer.
             owner.buf[buf_idx] = orig;
 
@@ -265,7 +247,7 @@ class TBitset {
     }
     bool
     operator!=(TBitset& rhs) const noexcept {
-        return !this == rhs;
+        return !(this == rhs);
     }
 
     std::string

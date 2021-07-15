@@ -9,15 +9,17 @@
 class TsetlinRandGen {
     constexpr static float max_16 = 0xffff;
     constexpr static float max_16_inv = 1. / max_16;
-    constexpr static double max_32 = (double)0xffffffff;
+    constexpr static double max_32 =
+        (double)std::numeric_limits<std::uint32_t>::max();
     constexpr static double max_32_inv = 1. / max_32;
-    constexpr static double max_64 = (double)0xffffffffffffffff;
+    constexpr static double max_64 =
+        (double)std::numeric_limits<std::uint64_t>::max();
     constexpr static double max_64_inv = 1. / max_64;
 
    public:
     uint64_t state;
 
-    inline TsetlinRandGen(uint64_t seed = 0xabcdef0123456789) { state = seed; }
+    inline TsetlinRandGen(uint64_t seed = 0xabcdef0123456789) : state(seed) {}
 
     // https://en.wikipedia.org/wiki/Xorshift
 
@@ -47,21 +49,13 @@ class TsetlinRandGen {
         return (this->rand_64() * max_64_inv) <= p;
     }
 
-    // Returns bit with probability:
-    //   p in 0x01 position,
-    // 1-p in 0x10 position
-    // 0 otherwise.
-    // Places t1 in bit 0x1
-    // Places t2 in bit 0x2
+    // return (rand_bernoulli(p) | (rand_bernoulli(1-p) << 1))
     uint8_t
-    sample_feedback(float p, bool polarity) noexcept {
-        p = std::abs(polarity - p);
+    sample_feedback(float p) noexcept {
         // float loses precision, but that's okay.
         uint64_t r = rand_64();
-        uint64_t s1 = r & 0x00000000ffffffff;
-        uint64_t s2 = r & 0xffffffff00000000;
-        uint32_t r1 = s1 >> 0;
-        uint32_t r2 = s2 >> 32;
+        uint32_t r1 = (r & 0x00000000ffffffff) >> 0;
+        uint32_t r2 = (r & 0xffffffff00000000) >> 32;
         double d1 = r1 * max_32_inv;
         double d2 = r2 * max_32_inv;
 
@@ -69,8 +63,11 @@ class TsetlinRandGen {
         // Therefore, 1 polarity (positive clause) inverts p,
         // and 0 keeps it the same.
 
+        // (_T + clip(sum)) / _2T,
+        // (_T - clip(sum)) / _2T;
+
         uint8_t t1 = d1 <= p;
-        uint8_t t2 = d2 <= (1 - p);
+        uint8_t t2 = d2 <= p;
 
         uint8_t a1 = (t1 << 0);
         uint8_t a2 = (t2 << 1);
