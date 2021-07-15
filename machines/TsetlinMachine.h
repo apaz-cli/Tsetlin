@@ -52,7 +52,7 @@ class TsetlinMachine {
         std::numeric_limits<TsetlinAutomaton>::min() <= TA_min,
         "The number of states in a Tsetlin machine must fall within limits.");
     static_assert(
-        std::numeric_limits<TsetlinAutomaton>::max() <= TA_max,
+        std::numeric_limits<TsetlinAutomaton>::max() >= TA_max,
         "The number of states in a Tsetlin machine must fall within limits.");
     static_assert(num_clauses, "The number of clauses must not be zero.");
     static_assert(input_bits, "The number of input bits must not be zero.");
